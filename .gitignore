@@ -1,5 +1,9 @@
 node_modules/
 .env
+.env.local
+.env.verify
+.env.*.local
 uploads/*
 !uploads/.gitkeep
 .superpowers/
+.claude/
