@@ -18,7 +18,7 @@ const userSchema = new Schema(
       lowercase: true,
       minlength: [3, 'Username must be at least 3 characters'],
       maxlength: [50, 'Username too long'],
-      index: true,
+      // `unique: true` already creates the index; no separate `index: true` needed.
     },
     name: {
       type: String,

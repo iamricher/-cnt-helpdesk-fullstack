@@ -17,9 +17,8 @@ const ticketSchema = new Schema(
     ticketId: {
       type: String,
       required: true,
-      unique: true,
+      unique: true, // creates the unique index; no separate `index: true` needed
       trim: true,
-      index: true,
     },
     summary: { type: String, default: 'N/A', trim: true },
     assignee: { type: String, default: 'N/A', trim: true, index: true },
@@ -35,7 +34,7 @@ const ticketSchema = new Schema(
     firstResponseSecsRaw: { type: String, default: 'N/A' }, // source first_response_secs
 
     // Derived (computed by slaEngine.deriveTicketFields). Column swap applied.
-    date: { type: Date, default: null, index: true },
+    date: { type: Date, default: null }, // indexed explicitly below as { date: -1 }
     frSecs: { type: Number, default: null }, // actual First Response seconds
     ctSecs: { type: Number, default: null }, // actual Close/Resolution seconds
     frPass: { type: Schema.Types.Mixed, default: 'pending' }, // true|false|'pending'|null

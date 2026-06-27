@@ -11,7 +11,7 @@ const { Schema } = mongoose;
  */
 const settingSchema = new Schema(
   {
-    key: { type: String, required: true, unique: true, default: 'global', index: true },
+    key: { type: String, required: true, unique: true, default: 'global' },
     slaTiers: {
       high: { fr: { type: Number, default: 1800 }, ct: { type: Number, default: 28800 } },
       medium: { fr: { type: Number, default: 3600 }, ct: { type: Number, default: 86400 } },

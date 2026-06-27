@@ -11,7 +11,7 @@ const { Schema } = mongoose;
  */
 const snapshotSchema = new Schema(
   {
-    date: { type: String, required: true, unique: true, index: true }, // YYYY-MM-DD
+    date: { type: String, required: true, unique: true }, // YYYY-MM-DD (unique index)
     slaScore: { type: Number, default: null },
     grade: { type: String, default: '?' },
     openCount: { type: Number, default: 0 },
