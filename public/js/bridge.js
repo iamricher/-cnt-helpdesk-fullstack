@@ -228,6 +228,33 @@
     } catch (e) { toastSafe(`Could not save thresholds: ${e.message}`, 'error'); }
   };
 
+  // ── Override: wipe -> delete on the SERVER, then refresh ──
+  // The original wipeDB only cleared local IndexedDB + in-memory state, so the
+  // server copy survived and reloaded on the next page load. This makes the
+  // "Wipe All Data" button actually purge MongoDB (admin+ only).
+  global.wipeDB = async function wipeDB() {
+    if (D.currentUser && !['admin', 'superadmin'].includes(D.currentUser.role)) {
+      toastSafe('You do not have permission to wipe data.', 'error');
+      return;
+    }
+    // eslint-disable-next-line no-alert, no-restricted-globals
+    if (!confirm('PERMANENTLY delete ALL ticket data on the SERVER? This affects every user and cannot be undone.')) return;
+    try {
+      await API.wipeTickets();
+    } catch (e) {
+      toastSafe(`Server wipe failed: ${e.message}`, 'error');
+      return;
+    }
+    // Clear the local cache too, then re-sync the (now empty) server state.
+    try { if (typeof D.dbClear === 'function') await D.dbClear(); } catch (e) { /* non-fatal */ }
+    D.masterData = [];
+    D.filteredData = [];
+    D.allCols = [];
+    await loadTicketsFromServer();
+    if (typeof D.updateHealthBar === 'function') D.updateHealthBar();
+    toastSafe('All ticket data wiped from the server.', 'success');
+  };
+
   // ── Boot: restore session on page load ──
   document.addEventListener('DOMContentLoaded', async () => {
     if (!API.isAuthed()) { showAuthScreen(); return; }
