@@ -33,6 +33,9 @@ app.use(helmet({
       'style-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
       'font-src': ["'self'", 'https://cdnjs.cloudflare.com', 'https://fonts.gstatic.com', 'data:'],
       'img-src': ["'self'", 'data:', 'blob:'],
+      // The PDF "Print Preview" renders a generated PDF as a blob: URL inside an
+      // <iframe>; frame-src must allow blob: or Chrome shows "content is blocked".
+      'frame-src': ["'self'", 'blob:'],
       'connect-src': ["'self'"],
     },
   },
