@@ -82,6 +82,9 @@
         D.masterData.forEach((r) => Object.keys(r).filter((k) => !k.startsWith('_')).forEach((k) => cs.add(k)));
         D.allCols = [...cs];
       }
+      // Pull server trend history so getSnapshots() (overridden below) is fresh
+      // before the trend panel renders inside applyFilter().
+      await syncSnapshotsFromServer();
       if (typeof D.buildFilterDropdowns === 'function') D.buildFilterDropdowns();
       if (typeof D.applyFilter === 'function') D.applyFilter();
       if (typeof D.renderUploadSummary === 'function') D.renderUploadSummary();
@@ -254,6 +257,180 @@
     if (typeof D.updateHealthBar === 'function') D.updateHealthBar();
     toastSafe('All ticket data wiped from the server.', 'success');
   };
+
+  // ── Escape user-controlled text before inserting via innerHTML (XSS guard) ──
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  // ── Override: User Management -> MongoDB via /api/users ──
+  // The original panel read/wrote localStorage (itd_users3); accounts created
+  // there never reached the server. These overrides make the panel the real
+  // user store backed by MongoDB.
+  let _usersCache = [];
+
+  global.renderUsers = async function renderUsers() {
+    const body = $('userBody');
+    if (!body) return;
+    try {
+      const res = await API.listUsers();
+      _usersCache = res.data || [];
+    } catch (e) {
+      body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3);">Could not load users: ${esc(e.message)}</td></tr>`;
+      return;
+    }
+    const meId = D.currentUser ? D.currentUser.id : null;
+    const tagClass = (r) => (typeof D.roleTagClass === 'function' ? D.roleTagClass(r) : '');
+    const tagLabel = (r) => (typeof D.roleLabel === 'function' ? D.roleLabel(r) : r);
+    body.innerHTML = _usersCache.map((u) => {
+      const created = (u.createdAt || '').slice(0, 10);
+      const initial = esc((u.name || u.username || '?')[0].toUpperCase());
+      // Don't allow deleting yourself or a superadmin from the table.
+      const delBtn = (u._id === meId || u.role === 'superadmin')
+        ? ''
+        : `<button onclick="delUser('${u._id}')" class="btn btn-xs" style="background:var(--red-bg2);color:var(--red);border:1px solid var(--red-border);border-radius:6px;padding:4px 9px;font-size:.68rem;cursor:pointer;"><i class="fa fa-trash"></i></button>`;
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:9px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--red);color:#fff;font-size:.7rem;font-weight:800;display:flex;align-items:center;justify-content:center;">${initial}</div><span style="font-weight:600;">${esc(u.name || '(no name)')}</span></div></td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text2);">${esc(u.username)}</td>
+        <td><span class="role-tag ${tagClass(u.role)}">${esc(tagLabel(u.role))}</span></td>
+        <td style="font-size:.74rem;color:var(--text3);">${esc(created)}</td>
+        <td style="text-align:center;">
+          <button onclick="editUser('${u._id}')" class="btn btn-ghost btn-xs" style="margin-right:4px;"><i class="fa fa-pen"></i></button>
+          ${delBtn}
+        </td>
+      </tr>`;
+    }).join('');
+  };
+
+  global.editUser = function editUser(id) {
+    const u = _usersCache.find((x) => x._id === id);
+    if (!u) return;
+    D.editingUID = id;
+    $('umTitle').textContent = 'Edit User';
+    $('umSaveBtn').textContent = 'Save Changes';
+    $('umName').value = u.name || '';
+    $('umUser').value = u.username || '';
+    $('umPass').value = '';
+    $('umRole').value = u.role;
+    $('umErr').style.display = 'none';
+    if (typeof D.openModal === 'function') D.openModal('userModal');
+  };
+
+  global.saveUser = async function saveUser() {
+    const name = $('umName').value.trim();
+    const username = $('umUser').value.trim();
+    const pass = $('umPass').value;
+    const role = $('umRole').value;
+    const err = $('umErr');
+    const showErr = (m) => { err.textContent = m; err.style.display = 'block'; };
+    err.style.display = 'none';
+    if (!username) { showErr('Username is required.'); return; }
+    try {
+      if (D.editingUID) {
+        // Username changes aren't supported server-side; role/name are.
+        await API.updateUser(D.editingUID, { name, role });
+        if (pass) {
+          if (pass.length < 12) { showErr('Password must be at least 12 characters.'); return; }
+          await API.resetUserPassword(D.editingUID, pass);
+        }
+        toastSafe('User updated.', 'success');
+      } else {
+        if (!pass || pass.length < 12) { showErr('A password of at least 12 characters is required for new users.'); return; }
+        await API.createUser({
+          username, password: pass, name, role,
+        });
+        toastSafe('User created.', 'success');
+      }
+    } catch (e) {
+      showErr(e.message || 'Save failed.');
+      return;
+    }
+    if (typeof D.closeModal === 'function') D.closeModal('userModal');
+    await global.renderUsers();
+  };
+
+  global.delUser = async function delUser(id) {
+    // eslint-disable-next-line no-alert, no-restricted-globals
+    if (!confirm('Delete this user? This removes the account from the server.')) return;
+    try {
+      await API.deleteUser(id);
+      toastSafe('User deleted.', 'success');
+    } catch (e) {
+      toastSafe(`Delete failed: ${e.message}`, 'error');
+      return;
+    }
+    await global.renderUsers();
+  };
+
+  // ── Override: Audit log -> MongoDB via /api/audit ──
+  const AUDIT_META = {
+    login: { icon: 'fa-right-to-bracket', cls: 'log-login' },
+    auth: { icon: 'fa-user-shield', cls: 'log-login' },
+    upload: { icon: 'fa-cloud-arrow-up', cls: 'log-upload' },
+    sla: { icon: 'fa-sliders', cls: 'log-sla' },
+    user: { icon: 'fa-user-pen', cls: 'log-sla' },
+  };
+  function auditMeta(type) { return AUDIT_META[type] || { icon: 'fa-circle-info', cls: 'log-login' }; }
+
+  global.renderAuditLog = async function renderAuditLog() {
+    const el = $('auditLogList');
+    if (!el) return;
+    let entries = [];
+    try {
+      const res = await API.listAudit(200);
+      entries = res.data || [];
+    } catch (e) {
+      el.innerHTML = `<div class="empty-sub" style="text-align:center;padding:20px;">Could not load audit log: ${esc(e.message)}</div>`;
+      return;
+    }
+    if (!entries.length) { el.innerHTML = '<div class="empty-sub" style="text-align:center;padding:20px;">No activity recorded.</div>'; return; }
+    el.innerHTML = entries.map((e) => {
+      const m = auditMeta(e.type);
+      const when = e.createdAt ? new Date(e.createdAt).toLocaleString() : '';
+      return `<div class="log-item"><div class="log-icon ${m.cls}"><i class="fa ${m.icon}"></i></div><div><div class="log-msg">${esc(e.message)}</div><div class="log-ts">${esc(when)} | ${esc(e.actor || 'system')}</div></div></div>`;
+    }).join('');
+  };
+
+  global.clearAuditLog = async function clearAuditLog() {
+    // eslint-disable-next-line no-alert, no-restricted-globals
+    if (!confirm('Clear the entire server audit log? This cannot be undone.')) return;
+    try {
+      await API.clearAudit();
+      toastSafe('Audit log cleared.', 'success');
+    } catch (e) {
+      toastSafe(`Could not clear audit log: ${e.message}`, 'error');
+      return;
+    }
+    global.renderAuditLog();
+  };
+
+  // ── Override: Trends/snapshots -> MongoDB via /api/snapshots ──
+  // Server saves a daily snapshot on every upload / settings change. The client
+  // just reads them; getSnapshots() returns this cache synchronously so the
+  // existing trend-panel code works unchanged.
+  let _snapshotsCache = [];
+  async function syncSnapshotsFromServer() {
+    try {
+      const res = await API.listSnapshots(365);
+      _snapshotsCache = (res.data || []).map((s) => ({
+        date: s.date,
+        slaScore: s.slaScore,
+        grade: s.grade,
+        openCount: s.openCount,
+        breachCount: s.breachCount,
+        staleCount: s.staleCount,
+        highPct: s.highPct,
+        medPct: s.medPct,
+        lowPct: s.lowPct,
+        ticketTotal: s.ticketTotal,
+      }));
+    } catch (e) { /* non-fatal: trend panel shows "building history" */ }
+  }
+  global.getSnapshots = function getSnapshots() { return _snapshotsCache; };
+  // Server persists snapshots; the local writer becomes a no-op to avoid drift.
+  global.saveDailySnapshot = function saveDailySnapshot() {};
 
   // ── Boot: restore session on page load ──
   document.addEventListener('DOMContentLoaded', async () => {
