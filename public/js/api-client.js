@@ -71,6 +71,7 @@
       return request('/tickets/upload', { method: 'POST', body: fd, isForm: true });
     },
     getStats: () => request('/tickets/stats'),
+    setRootCause: (ticketId, data) => request(`/tickets/${encodeURIComponent(ticketId)}/root-cause`, { method: 'PATCH', body: data }),
     wipeTickets: () => request('/tickets', { method: 'DELETE' }),
 
     // ── Snapshots ──

@@ -42,6 +42,10 @@ const ticketSchema = new Schema(
 
     // Bag for any extra CSV columns not explicitly modelled
     extra: { type: Map, of: String, default: {} },
+
+    // Operator-assigned root-cause tag (feeds Recurring Issues analytics).
+    // null until tagged; shape: { cause, customText, user, ts }.
+    rootCause: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true },
 );

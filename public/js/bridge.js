@@ -77,6 +77,20 @@
       }
       D.masterData = all.map(toClientRecord);
       D.filteredData = [...D.masterData];
+      // Hydrate root-cause tags from the server so they persist across reloads
+      // and devices (feeds the Recurring Issues view + Data Audit).
+      const rc = {};
+      all.forEach((t) => {
+        if (t.rootCause && t.rootCause.cause) {
+          rc[t.ticketId] = {
+            cause: t.rootCause.cause,
+            customText: t.rootCause.customText || '',
+            user: t.rootCause.user || '',
+            ts: t.rootCause.ts || new Date().toISOString(),
+          };
+        }
+      });
+      D._rootCauses = rc;
       if (typeof D.allCols !== 'undefined') {
         const cs = new Set();
         D.masterData.forEach((r) => Object.keys(r).filter((k) => !k.startsWith('_')).forEach((k) => cs.add(k)));
@@ -450,6 +464,34 @@
     }
     ['pwCur', 'pwNew', 'pwCon'].forEach((id) => { if ($(id)) $(id).value = ''; });
     toastSafe('Password changed.', 'success');
+  };
+
+  // ── Override: root-cause tagging -> MongoDB (persists on the ticket) ──
+  // The original saveRootCause only wrote localStorage, which bridge never
+  // restored on login, so tags appeared to vanish. This persists server-side.
+  global.saveRootCause = async function saveRootCause() {
+    const id = D.currentTicketID;
+    if (!id) return;
+    const cause = $('rcSelect').value;
+    const customText = cause === 'Other' ? $('rcOther').value.trim() : '';
+    if (cause === 'Other' && !customText) { toastSafe('Please describe the root cause.', 'error'); return; }
+    try {
+      await API.setRootCause(id, { cause, customText });
+    } catch (e) {
+      toastSafe(`Could not save root cause: ${e.message}`, 'error');
+      return;
+    }
+    if (!cause) {
+      delete D._rootCauses[id];
+    } else {
+      D._rootCauses[id] = {
+        cause, customText, user: (D.currentUser && D.currentUser.name) || 'admin', ts: new Date().toISOString(),
+      };
+    }
+    if (typeof D.renderRootCauseUI === 'function') D.renderRootCauseUI(id);
+    if ($('pg-audit') && $('pg-audit').classList.contains('active') && typeof D.renderRaw === 'function') D.renderRaw();
+    if ($('pg-recurring') && $('pg-recurring').classList.contains('active') && typeof D.renderRecurring === 'function') D.renderRecurring();
+    toastSafe(cause ? 'Root cause saved.' : 'Root cause tag cleared.', 'success');
   };
 
   // ── Boot: restore session on page load ──

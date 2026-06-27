@@ -239,6 +239,41 @@ const listSnapshots = asyncHandler(async (req, res) => {
   return ok(res, snaps);
 });
 
+/**
+ * PATCH /api/tickets/:ticketId/root-cause - set or clear a ticket's root-cause
+ * tag (itstaff+). Persists to MongoDB so it survives reloads and syncs across
+ * devices; feeds the Recurring Issues analytics. Empty cause clears the tag.
+ */
+const setRootCause = asyncHandler(async (req, res) => {
+  const { ticketId } = req.params;
+  const { cause, customText } = req.body || {};
+  const ticket = await Ticket.findOne({ ticketId });
+  if (!ticket) return fail(res, 'Ticket not found', 404);
+
+  if (!cause || !String(cause).trim()) {
+    ticket.rootCause = null;
+  } else {
+    ticket.rootCause = {
+      cause: String(cause).trim(),
+      customText: customText ? String(customText).trim() : '',
+      user: req.user.name || req.user.username,
+      ts: new Date().toISOString(),
+    };
+  }
+  ticket.markModified('rootCause');
+  await ticket.save();
+
+  await AuditLog.create({
+    type: 'sla',
+    message: ticket.rootCause
+      ? `Root cause tagged for ticket ${ticketId}: ${ticket.rootCause.customText || ticket.rootCause.cause}`
+      : `Root cause cleared for ticket ${ticketId}`,
+    actor: req.user.username,
+    ip: req.ip || '',
+  });
+  return ok(res, { ticketId, rootCause: ticket.rootCause }, 'Root cause updated');
+});
+
 /** DELETE /api/tickets - wipe all tickets (admin+). */
 const wipeTickets = asyncHandler(async (req, res) => {
   const result = await Ticket.deleteMany({});
@@ -249,5 +284,5 @@ const wipeTickets = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listTickets, uploadCsv, getStats, listSnapshots, wipeTickets, refreshTodaySnapshot,
+  listTickets, uploadCsv, getStats, listSnapshots, wipeTickets, refreshTodaySnapshot, setRootCause,
 };
