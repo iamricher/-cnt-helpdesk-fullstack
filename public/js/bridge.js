@@ -494,6 +494,32 @@
     toastSafe(cause ? 'Root cause saved.' : 'Root cause tag cleared.', 'success');
   };
 
+  // The dashboard's getRcLabel/renderRootCauseUI read a closure-scoped
+  // _rootCauses that the bridge can't populate from outside. Override both to
+  // read the bridge-hydrated window._rootCauses so Recurring Issues, the KB
+  // detector, the health score and Data Audit all see server-persisted tags.
+  global.getRcLabel = function getRcLabel(id) {
+    const rc = D._rootCauses ? D._rootCauses[id] : null;
+    if (!rc) return null;
+    return rc.cause === 'Other' ? (rc.customText || 'Other') : rc.cause;
+  };
+
+  global.renderRootCauseUI = function renderRootCauseUI(id) {
+    const rc = D._rootCauses ? D._rootCauses[id] : null;
+    const sel = $('rcSelect'); const other = $('rcOther'); const cur = $('rcCurrentTag');
+    if (!sel || !cur) return;
+    if (rc) {
+      const known = Array.from(sel.options).some((o) => o.value === rc.cause);
+      sel.value = known ? rc.cause : 'Other';
+      if (sel.value === 'Other') { if (other) { other.style.display = 'block'; other.value = rc.customText || (known ? '' : rc.cause) || ''; } } else if (other) { other.style.display = 'none'; other.value = ''; }
+      const label = rc.cause === 'Other' ? (rc.customText || 'Other') : rc.cause;
+      cur.innerHTML = `<i class="fa fa-circle-check" style="color:var(--green);margin-right:4px;"></i>Currently tagged: <strong style="color:var(--text1);">${esc(label)}</strong> | by ${esc(rc.user || '')} | ${rc.ts ? new Date(rc.ts).toLocaleDateString() : ''}`;
+    } else {
+      sel.value = ''; if (other) { other.style.display = 'none'; other.value = ''; }
+      cur.innerHTML = '<i class="fa fa-circle-question" style="margin-right:4px;"></i>Not tagged yet.';
+    }
+  };
+
   // ── Boot: restore session on page load ──
   document.addEventListener('DOMContentLoaded', async () => {
     if (!API.isAuthed()) { showAuthScreen(); return; }
