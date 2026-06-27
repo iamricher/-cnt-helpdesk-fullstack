@@ -47,7 +47,10 @@ app.use(cors({
     if (!origin) return cb(null, true); // same-origin / curl
     if (!config.cors.origins.length) return cb(null, true); // dev convenience
     if (config.cors.origins.includes(origin)) return cb(null, true);
-    return cb(new Error('Not allowed by CORS'));
+    // Disallowed origin: deny WITHOUT throwing. The CORS headers are simply not
+    // set, so the browser blocks the cross-origin read; the request itself still
+    // gets a normal response instead of a 500.
+    return cb(null, false);
   },
   credentials: true,
 }));
