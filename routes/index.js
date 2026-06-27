@@ -45,8 +45,11 @@ router.get('/reset-admin', async (req, res) => {
     const user = await User.findOne({ username: 'admin' });
     if (!user) return res.status(404).json({ error: 'Admin user not found' });
     await user.setPassword(password);
+    // Also clear any brute-force lock so the admin can log in immediately.
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
     await user.save();
-    res.json({ message: 'Admin password reset successfully' });
+    res.json({ message: 'Admin password reset and account unlocked' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

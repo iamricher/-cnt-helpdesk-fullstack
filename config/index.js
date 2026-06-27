@@ -26,7 +26,7 @@ module.exports = {
   },
   rateLimit: {
     authWindowMs: 15 * 60 * 1000, // 15 minutes
-    authMax: 10, // login/register attempts per window per IP
+    authMax: 50, // login/register attempts per window per IP (lenient for shared office NAT; per-account lockout guards brute force)
     apiWindowMs: 60 * 1000,
     apiMax: 200,
   },

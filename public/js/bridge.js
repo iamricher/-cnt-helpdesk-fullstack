@@ -108,8 +108,8 @@
 
   // ── Override: login ──
   global.doLogin = async function doLogin() {
-    const uEl = $('authUser') || $('loginUser') || $('username');
-    const pEl = $('authPass') || $('loginPass') || $('password');
+    const uEl = $('authUser') || $('loginUser') || $('username') || $('li-user');
+    const pEl = $('authPass') || $('loginPass') || $('password') || $('li-pass');
     const errEl = $('authErr') || $('loginErr');
     const username = uEl ? uEl.value.trim() : '';
     const password = pEl ? pEl.value : '';

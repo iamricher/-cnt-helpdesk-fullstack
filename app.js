@@ -27,6 +27,9 @@ app.use(helmet({
     directives: {
       'default-src': ["'self'"],
       'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net'],
+      // Allow inline event handlers (onclick="...") used throughout the dashboard.
+      // helmet's default sets script-src-attr to 'none', which blocks them.
+      'script-src-attr': ["'unsafe-inline'"],
       'style-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
       'font-src': ["'self'", 'https://cdnjs.cloudflare.com', 'https://fonts.gstatic.com', 'data:'],
       'img-src': ["'self'", 'data:', 'blob:'],
@@ -70,11 +73,23 @@ app.use('/api', async (req, res, next) => {
 app.use('/api', apiLimiter, apiRoutes);
 
 // Serve the static front-end (the dashboard) from /public.
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', extensions: ['html'] }));
+// HTML and JS are served with no-cache so client logic updates take effect on
+// the next load; other assets (images, fonts) keep a short cache.
+app.use(express.static(path.join(__dirname, 'public'), {
+  extensions: ['html'],
+  setHeaders(res, filePath) {
+    if (/\.(html|js)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  },
+}));
 
 // SPA-style fallback: any non-API GET returns the dashboard shell.
 app.get(/^(?!\/api).*/, (req, res, next) => {
   if (req.method !== 'GET') return next();
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   return res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => { if (err) next(); });
 });
 

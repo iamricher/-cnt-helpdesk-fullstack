@@ -1813,7 +1813,7 @@ select.tbf-ctrl{cursor:pointer;-webkit-appearance:none;padding-right:20px;
 /* SLA targets by priority tier (seconds). Replaces the old single global FR_SLA/CT_SLA.
    Default tier (for blank/unrecognized priority values) is Medium, since that's the
    most common priority value in this dataset and a reasonable neutral fallback. */
-let SLA_TIERS={
+var SLA_TIERS={
   high:{fr:1800,ct:28800},     // 30 min FR, 8 hr CT
   medium:{fr:3600,ct:86400},   // 1 hr FR, 24 hr CT
   low:{fr:14400,ct:259200}     // 4 hr FR, 72 hr CT
@@ -1823,7 +1823,7 @@ function getSlaTier(priority){
   const p=(priority||'').toLowerCase();
   return SLA_TIERS[p]||SLA_TIERS[SLA_DEFAULT_TIER];
 }
-let masterData=[], filteredData=[], allCols=[], hiddenCols=new Set();
+var masterData=[], filteredData=[], allCols=[], hiddenCols=new Set();
 
 /* ════════════════════════════════════════════════
    DYNAMIC SLA TIME ANCHOR
@@ -1851,7 +1851,7 @@ function slaNow(){
    (inside processData), since both represent genuinely new information worth re-surfacing.
 ════════════════════════════════════════════════ */
 let hideOpenBadge=false, hideAgeBadge=false, hideRecurBadge=false;
-let currentUser=null, editingUID=null, currentTicketID=null, pendingRows=null;
+var currentUser=null, editingUID=null, currentTicketID=null, pendingRows=null;
 let charts={};
 let rawPage=1, RAW_PER=50, rawSortCol=null, rawSortDir=1;
 let agentSortKey='t', agentSortDir=-1;
@@ -2060,6 +2060,7 @@ function doLogout(reason=''){
 }
 
 const ROLE_PAGES={
+  superadmin:['dashboard','openTickets','agents','recurring','catanalytics','audit','upload','report','users','auditlog','settings'],
   admin:['dashboard','openTickets','agents','recurring','catanalytics','audit','upload','report','users','auditlog','settings'],
   itstaff:['dashboard','openTickets','agents','recurring','catanalytics','upload'],
   viewer:['dashboard','openTickets','agents','recurring','catanalytics']
@@ -2070,7 +2071,7 @@ function applyRoleUI(){
   const init=currentUser.name[0].toUpperCase();
   q('sbAvatar').textContent=init;
   q('sbName').textContent=currentUser.name;
-  const roleLabel={admin:'Admin',itstaff:'IT Staff',viewer:'Viewer'}[currentUser.role]||currentUser.role;
+  const roleLabel={superadmin:'Super Admin',admin:'Admin',itstaff:'IT Staff',viewer:'Viewer'}[currentUser.role]||currentUser.role;
   q('sbRole').textContent=roleLabel;
   const allowed=new Set(allowedPages());
   const allNavIds=['nav-dashboard','nav-openTickets','nav-agents','nav-recurring','nav-catanalytics','nav-audit','nav-upload','nav-report','nav-users','nav-auditlog','nav-settings'];
@@ -2081,7 +2082,7 @@ function applyRoleUI(){
   // Section headers: "Data" shows if audit/upload/report visible; "Admin" only for admin role
   const dataVisible=allowed.has('audit')||allowed.has('upload')||allowed.has('report');
   const ds=q('data-section');if(ds)ds.style.display=dataVisible?'':'none';
-  const as=q('adm-section');if(as)as.style.display=currentUser.role==='admin'?'':'none';
+  const as=q('adm-section');if(as)as.style.display=(currentUser.role==='admin'||currentUser.role==='superadmin')?'':'none';
 }
 
 function togglePw(id,btn){const el=q(id);el.type=el.type==='password'?'text':'password';btn.innerHTML=el.type==='text'?'<i class="fa fa-eye-slash"></i>':'<i class="fa fa-eye"></i>';}
@@ -2668,7 +2669,7 @@ function updateOpenBadge(){
 ════════════════════════════════════════════════ */
 
 /* --- Stale thresholds (days since last status change), configurable in Settings --- */
-let STALE_THRESHOLDS=ls.get('itd_stale_thresholds',{high:1,medium:3,low:7});
+var STALE_THRESHOLDS=ls.get('itd_stale_thresholds',{high:1,medium:3,low:7});
 function staleThresholdFor(priority){
   const p=(priority||'').toLowerCase();
   return STALE_THRESHOLDS[p]!=null?STALE_THRESHOLDS[p]:(STALE_THRESHOLDS.medium||3);
@@ -4271,8 +4272,8 @@ function renderUploadSummary(){
 /* ════════════════════════════════════════════════
    USER MANAGEMENT
 ════════════════════════════════════════════════ */
-function roleTagClass(role){return role==='admin'?'tag-admin':role==='itstaff'?'tag-itstaff':'tag-viewer';}
-function roleLabel(role){return{admin:'Admin',itstaff:'IT Staff',viewer:'Viewer'}[role]||role;}
+function roleTagClass(role){return (role==='admin'||role==='superadmin')?'tag-admin':role==='itstaff'?'tag-itstaff':'tag-viewer';}
+function roleLabel(role){return{superadmin:'Super Admin',admin:'Admin',itstaff:'IT Staff',viewer:'Viewer'}[role]||role;}
 function renderUsers(){
   q('userBody').innerHTML=getUsers().map(u=>`<tr>
     <td><div style="display:flex;align-items:center;gap:9px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--red);color:#fff;font-size:.7rem;font-weight:800;display:flex;align-items:center;justify-content:center;">${u.name[0].toUpperCase()}</div><span style="font-weight:600;">${u.name}</span></div></td>
@@ -6141,7 +6142,7 @@ function resetCatColors(){
   document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
 })();
 </script>
-<script src="/js/api-client.js"></script>
-<script src="/js/bridge.js"></script>
+<script src="/js/api-client.js?v=2"></script>
+<script src="/js/bridge.js?v=2"></script>
 </body>
 </html>
