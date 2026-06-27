@@ -16,7 +16,7 @@ router.post(
   '/',
   [
     body('username').isString().trim().isLength({ min: 3, max: 50 }),
-    body('password').isString().isLength({ min: 12 }).withMessage('Password must be at least 12 characters'),
+    body('password').isString().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('role').optional().isIn(['viewer', 'itstaff', 'admin', 'superadmin']),
     body('email').optional({ checkFalsy: true }).isEmail(),
   ],
@@ -37,7 +37,7 @@ router.patch(
 
 router.post(
   '/:id/reset-password',
-  [body('newPassword').isString().isLength({ min: 12 }).withMessage('Password must be at least 12 characters')],
+  [body('newPassword').isString().isLength({ min: 6 }).withMessage('Password must be at least 6 characters')],
   validate,
   ctrl.resetPassword,
 );

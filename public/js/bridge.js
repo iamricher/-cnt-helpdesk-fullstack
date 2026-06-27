@@ -332,12 +332,12 @@
         // Username changes aren't supported server-side; role/name are.
         await API.updateUser(D.editingUID, { name, role });
         if (pass) {
-          if (pass.length < 12) { showErr('Password must be at least 12 characters.'); return; }
+          if (pass.length < 6) { showErr('Password must be at least 6 characters.'); return; }
           await API.resetUserPassword(D.editingUID, pass);
         }
         toastSafe('User updated.', 'success');
       } else {
-        if (!pass || pass.length < 12) { showErr('A password of at least 12 characters is required for new users.'); return; }
+        if (!pass || pass.length < 6) { showErr('A password of at least 6 characters is required for new users.'); return; }
         await API.createUser({
           username, password: pass, name, role,
         });
@@ -431,6 +431,26 @@
   global.getSnapshots = function getSnapshots() { return _snapshotsCache; };
   // Server persists snapshots; the local writer becomes a no-op to avoid drift.
   global.saveDailySnapshot = function saveDailySnapshot() {};
+
+  // ── Override: change own password -> server (/api/auth/change-password) ──
+  // The original changePw only updated localStorage, so it never affected the
+  // server-side login. This routes it through the API instead.
+  global.changePw = async function changePw() {
+    const cur = $('pwCur').value;
+    const nw = $('pwNew').value;
+    const cn = $('pwCon').value;
+    if (!cur || !nw || !cn) { toastSafe('All fields required.', 'error'); return; }
+    if (nw.length < 6) { toastSafe('New password must be at least 6 characters.', 'error'); return; }
+    if (nw !== cn) { toastSafe('Passwords do not match.', 'error'); return; }
+    try {
+      await API.changePassword({ currentPassword: cur, newPassword: nw });
+    } catch (e) {
+      toastSafe(e.message || 'Could not change password.', 'error');
+      return;
+    }
+    ['pwCur', 'pwNew', 'pwCon'].forEach((id) => { if ($(id)) $(id).value = ''; });
+    toastSafe('Password changed.', 'success');
+  };
 
   // ── Boot: restore session on page load ──
   document.addEventListener('DOMContentLoaded', async () => {

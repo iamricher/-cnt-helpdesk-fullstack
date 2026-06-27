@@ -14,7 +14,7 @@ router.post(
   authLimiter,
   [
     body('username').isString().trim().isLength({ min: 3, max: 50 }).withMessage('Username 3-50 chars'),
-    body('password').isString().isLength({ min: 12 }).withMessage('Password must be at least 12 characters'),
+    body('password').isString().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('name').optional().isString().trim().isLength({ max: 120 }),
     body('email').optional({ checkFalsy: true }).isEmail().withMessage('Invalid email'),
   ],
@@ -40,7 +40,7 @@ router.post(
   requireAuth,
   [
     body('currentPassword').isString().notEmpty(),
-    body('newPassword').isString().isLength({ min: 12 }).withMessage('New password must be at least 12 characters'),
+    body('newPassword').isString().isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
   ],
   validate,
   ctrl.changePassword,
