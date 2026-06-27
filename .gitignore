@@ -7,3 +7,6 @@ uploads/*
 !uploads/.gitkeep
 .superpowers/
 .claude/
+.playwright-mcp/
+*.jpeg
+*.png
