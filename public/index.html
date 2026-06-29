@@ -7,6 +7,9 @@
 <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAABGVJREFUeNrUWe1x2kAQPTH+H6WCQAUWacCiAksVGCoAKgAqwK4AUgG4AqCBQCqwUkGUCpzdzLtkudwdB0hAbmbHRujQfrzdt7eK1BnrffQ5pj9bknY0+VqqK6zGmfsHJE2SmbrSis70/htJjEtzkuGlI3FOBLpQfk1S4vOWDJuSpP9DBFb0hxVtw4AZPsu1JHmhqKxv0YB3VpyU+yiucT5kJA8wJhaG9OqAV3Si8qwcR2BNSnUCc6Qgyen+3S1VIZ8yM6G8QrVakWHJxSOAh6aARgJltFe1fEdE1vD+wpIT2uhOVXCKDpRJrix9obBUoml4WC4uqRMYMLXc90wGDGuDECk/Bn6nUHQHhdhzEUkbSvpKLO+/R5UyoTaAg85edxavrwCTP54khQvL3p+BTM1RyPG7MpLZASccbwAeUAgDlEN5BQL7QLIBD+j994LkFH6LI9mDEfJZ1UYAJS5HmeQk7NL/G7pu81SJKDwJZUsY1IaHY/HbnNw76ZzKDTAepsM+kqFGRZo6KgyvbyC4Z8t3ORxTmRFOHgD9szRJ6a5I7q1HeWbbsatEAo4dJHVROw8Ixi1gTNdz+9DhdRevFFVwQRTwsJXH49zjfAGBXeVAcxfQ89vwWqCqKBCdNubUxrCpq9Kxnevdge9HqCRzVJcZ8JsjkTPcNznyINS1dKz6e2W0KRvdohzbSjTBpiXOvAVdy2DAwuCKKFDxEcjNt9YwKnFAdu980TjgfYUNBRRdwnuJJdkPQWQboLwC87fhFOaToUGURUgvlEBR3vhseLFv2eJlVTggD8kT6V0QawzRXazfANEKa++XRv9ia8KeAhTbkeQi+UPzpS84pvQSGaDwBo8umZSM+x8dz0qRHyrAkLkn6c2uVTts7jrJNSykFXuw7cP6LPS0BccUjgS2Oew1iMiQbCMDKgWwuxHQOpSE4wB4DFCK5WppjAM+P8zBgRdCvJmEMdoCVvXJaxCoPK+HwEiY3uZikTDzw5HdEIIMrd8Z+vwEEluUYWNfj2FSjGb0/h5KbYzqV8J5bd8k4+S50LlLjF1e4OWZg7w++vqshrruasHTK4vy2uuLOudC56yBGBzElqlGBwUkRcLfDoSQ5FvXSAaFRJb2Eiy8q80APGx36FxgmXzIM/bQPH/ztFv0UHN0B7s6IPR7iOWb9wjPJwbWh+CAuYX0hmBuOcLP6sqBfx7ASvNnnKdLYLuD8hihfH4SZwtbxO5FnvTQFVcOobFowXWFsU0g9EGlaXSxe5NuQWZ9wQ17yoecyI5ZZm+zcIxRmo72O4W3U3S3mcHSE1t+VRkB832AEsfPFNE5ZhpXiqQtLlJGLTBS4sw8F63Ig6MI6ErzakLlUga4SqQV57bxTcj5ujYmBkY7yv3mZlM1KVbeSggjlhZMP1f+vJpbhkz9fUlitt96ks2tQ2l763l1AwxDHmFI6qg2A5zD85szwNM7Pan9gXHwgPjqBhjR0a9kW76af7OL3z+QLE7Z+0uAAQBaOQAo3P27kgAAAABJRU5ErkJggg=="/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>IT Analytics Helpdesk System</title>
+<!-- Session boot flag: if a JWT is already stored, mark the document as "booting"
+     so the login screen stays hidden while the session restores (no login flash). -->
+<script>try{if(localStorage.getItem('cnt_jwt'))document.documentElement.setAttribute('data-booting','1');}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -69,6 +72,9 @@ input,select,textarea{font-family:'Inter',sans-serif;}
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Outer wrapper ── */
+/* While restoring an existing session, keep the login screen hidden to avoid a
+   flash of the login form before the dashboard appears on reload. */
+html[data-booting] #authScreen{display:none!important;}
 #authScreen{
   min-height:100vh;display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden;

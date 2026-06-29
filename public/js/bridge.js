@@ -26,11 +26,14 @@
   function toastSafe(msg, type) { if (typeof D.toast === 'function') D.toast(msg, type); else console.log(`[${type}] ${msg}`); }
 
   function showAuthScreen() {
+    // Clear the boot flag so the login screen (hidden during session restore) can show.
+    document.documentElement.removeAttribute('data-booting');
     const auth = $('authScreen'); const app = $('app');
     if (auth) auth.style.display = 'flex';
     if (app) app.style.display = 'none';
   }
   function showApp() {
+    document.documentElement.removeAttribute('data-booting');
     const auth = $('authScreen'); const app = $('app');
     if (auth) auth.style.display = 'none';
     if (app) app.style.display = 'block';
@@ -523,6 +526,11 @@
   // ── Boot: restore session on page load ──
   document.addEventListener('DOMContentLoaded', async () => {
     if (!API.isAuthed()) { showAuthScreen(); return; }
+    // Optimistic restore: we already hold a token, so show the dashboard shell
+    // immediately using the cached user (set at login) — no login-screen flash.
+    // The token is then validated against the server in the background below.
+    const cachedUser = API.getUser();
+    if (cachedUser) { applySession(cachedUser); showApp(); }
     try {
       const res = await API.me();
       applySession(res.data.user);
@@ -531,6 +539,7 @@
       await loadTicketsFromServer();
       if (typeof D.startSession === 'function') D.startSession();
     } catch (e) {
+      // Token is invalid/expired — fall back to the login screen.
       API.clearToken();
       showAuthScreen();
     }
