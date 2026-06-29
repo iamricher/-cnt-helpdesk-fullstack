@@ -288,8 +288,10 @@ const wipeTickets = asyncHandler(async (req, res) => {
  * this and only do a full reload when count or lastModified changes.
  */
 const getVersion = asyncHandler(async (req, res) => {
+  // Exact count (not estimatedDocumentCount) so it matches the client's paged
+  // baseline and detects deletes immediately — avoids needless reload churn.
   const [count, latest] = await Promise.all([
-    Ticket.estimatedDocumentCount(),
+    Ticket.countDocuments({}),
     Ticket.findOne({}).sort({ updatedAt: -1 }).select('updatedAt').lean(),
   ]);
   return ok(res, { count, lastModified: latest ? latest.updatedAt : null });
