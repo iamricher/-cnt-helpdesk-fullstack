@@ -274,7 +274,7 @@ const setRootCause = asyncHandler(async (req, res) => {
   return ok(res, { ticketId, rootCause: ticket.rootCause }, 'Root cause updated');
 });
 
-/** DELETE /api/tickets - wipe all tickets (admin+). */
+/** DELETE /api/tickets - wipe all tickets (superadmin). */
 const wipeTickets = asyncHandler(async (req, res) => {
   const result = await Ticket.deleteMany({});
   await AuditLog.create({
@@ -283,6 +283,17 @@ const wipeTickets = asyncHandler(async (req, res) => {
   return ok(res, { deleted: result.deletedCount }, 'All tickets removed');
 });
 
+/** DELETE /api/tickets/:ticketId - delete a single ticket (admin+). */
+const deleteTicket = asyncHandler(async (req, res) => {
+  const { ticketId } = req.params;
+  const r = await Ticket.deleteOne({ ticketId });
+  if (!r.deletedCount) return fail(res, 'Ticket not found', 404);
+  await AuditLog.create({
+    type: 'upload', message: `Ticket deleted: ${ticketId}`, actor: req.user.username, ip: req.ip || '',
+  });
+  return ok(res, { deleted: r.deletedCount }, 'Ticket deleted');
+});
+
 module.exports = {
-  listTickets, uploadCsv, getStats, listSnapshots, wipeTickets, refreshTodaySnapshot, setRootCause,
+  listTickets, uploadCsv, getStats, listSnapshots, wipeTickets, deleteTicket, refreshTodaySnapshot, setRootCause,
 };

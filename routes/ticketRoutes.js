@@ -15,5 +15,6 @@ router.get('/stats', requireAuth, ctrl.getStats);
 router.post('/upload', requireAuth, requireRole('itstaff', 'admin'), upload.single('file'), ctrl.uploadCsv);
 router.patch('/:ticketId/root-cause', requireAuth, requireRole('itstaff', 'admin'), ctrl.setRootCause);
 router.delete('/', requireAuth, requireRole('superadmin'), ctrl.wipeTickets);
+router.delete('/:ticketId', requireAuth, requireRole('admin'), ctrl.deleteTicket);
 
 module.exports = router;
