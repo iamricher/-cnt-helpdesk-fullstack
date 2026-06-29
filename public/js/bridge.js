@@ -80,9 +80,10 @@
       }
       D.masterData = all.map(toClientRecord);
       D.filteredData = [...D.masterData];
-      // Hydrate root-cause tags from the server so they persist across reloads
-      // and devices (feeds the Recurring Issues view + Data Audit).
+      // Hydrate root-cause tags AND notes from the server so they persist across
+      // reloads and devices (feed Recurring Issues, Data Audit, ticket modal).
       const rc = {};
+      const notes = {};
       all.forEach((t) => {
         if (t.rootCause && t.rootCause.cause) {
           rc[t.ticketId] = {
@@ -92,8 +93,14 @@
             ts: t.rootCause.ts || new Date().toISOString(),
           };
         }
+        if (Array.isArray(t.notes) && t.notes.length) notes[t.ticketId] = t.notes;
       });
       D._rootCauses = rc;
+      D._notes = notes;
+      // Baseline change-token for the real-time poller (count + newest updatedAt).
+      let maxU = '';
+      all.forEach((t) => { if (t.updatedAt && t.updatedAt > maxU) maxU = t.updatedAt; });
+      _ticketsVersion = `${all.length}|${maxU}`;
       if (typeof D.allCols !== 'undefined') {
         const cs = new Set();
         D.masterData.forEach((r) => Object.keys(r).filter((k) => !k.startsWith('_')).forEach((k) => cs.add(k)));
@@ -102,6 +109,7 @@
       // Pull server trend history so getSnapshots() (overridden below) is fresh
       // before the trend panel renders inside applyFilter().
       await syncSnapshotsFromServer();
+      await syncPresetsFromServer();
       if (typeof D.buildFilterDropdowns === 'function') D.buildFilterDropdowns();
       if (typeof D.applyFilter === 'function') D.applyFilter();
       if (typeof D.renderUploadSummary === 'function') D.renderUploadSummary();
@@ -522,6 +530,105 @@
       cur.innerHTML = '<i class="fa fa-circle-question" style="margin-right:4px;"></i>Not tagged yet.';
     }
   };
+
+  // ── Override: Notes -> MongoDB (stored on the ticket) ──
+  // Reads/writes the server and uses D._notes (hydrated in loadTicketsFromServer)
+  // so the renderers see server data (the closure _notes can't be reached).
+  global.renderNotes = function renderNotes(id) {
+    const list = $('notesList');
+    if (!list) return;
+    const safeId = String(id).replace(/[\\'"]/g, '');
+    const arr = (D._notes && D._notes[id]) || [];
+    list.innerHTML = arr.length
+      ? arr.map((n, i) => `<div class="note-item"><div class="note-meta"><span>${esc(n.user)} | ${n.ts ? new Date(n.ts).toLocaleString() : ''}</span><button onclick="deleteNote('${safeId}',${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.67rem;"><i class="fa fa-trash"></i></button></div><div class="note-text">${esc(n.text)}</div></div>`).join('')
+      : '<div style="font-size:.74rem;color:var(--text3);padding:6px 0;">No notes yet.</div>';
+    const inp = $('noteInput'); if (inp) inp.value = '';
+  };
+
+  global.saveNote = async function saveNote() {
+    const id = D.currentTicketID;
+    if (!id) return;
+    const inp = $('noteInput');
+    const text = inp ? inp.value.trim() : '';
+    if (!text) { toastSafe('Enter note text.', 'error'); return; }
+    try {
+      const res = await API.addNote(id, text);
+      if (!D._notes) D._notes = {};
+      D._notes[id] = res.data.notes;
+    } catch (e) { toastSafe(`Could not save note: ${e.message}`, 'error'); return; }
+    global.renderNotes(id);
+    toastSafe('Note saved.', 'success');
+  };
+
+  global.deleteNote = async function deleteNote(id, idx) {
+    try {
+      const res = await API.deleteNote(id, idx);
+      if (!D._notes) D._notes = {};
+      D._notes[id] = res.data.notes;
+    } catch (e) { toastSafe(`Could not delete note: ${e.message}`, 'error'); return; }
+    global.renderNotes(id);
+  };
+
+  // ── Override: Presets -> MongoDB (shared filter shortcuts) ──
+  let _presetsCache = [];
+  async function syncPresetsFromServer() {
+    try { const res = await API.listPresets(); _presetsCache = res.data || []; } catch (e) { /* keep last */ }
+    if (typeof global.renderPresets === 'function') global.renderPresets();
+  }
+
+  global.renderPresets = function renderPresets() {
+    const row = $('presetsRow');
+    if (!row) return;
+    row.innerHTML = _presetsCache.map((p) => `<span class="preset-chip" onclick="applyPreset('${p.id}')"><i class="fa fa-bookmark" style="font-size:.58rem;"></i>${esc(p.name)}<button onclick="event.stopPropagation();delPreset('${p.id}')" style="background:none;border:none;color:currentColor;opacity:.6;margin-left:3px;cursor:pointer;" title="Delete">✕</button></span>`).join('');
+  };
+
+  global.applyPreset = function applyPreset(id) {
+    const p = _presetsCache.find((x) => x.id === id);
+    if (!p) return;
+    const set = (el, v) => { const e = $(el); if (e) e.value = v || ''; };
+    set('fYear', p.yr); set('fMonthNum', p.moNum); set('fFrom', p.sd); set('fTo', p.ed);
+    set('fAgent', p.ag); set('fPri', p.pri); set('fCat', p.cat);
+    if (typeof D.applyFilter === 'function') D.applyFilter();
+    toastSafe(`Preset applied: ${p.name}`, 'success');
+  };
+
+  global.doSavePreset = async function doSavePreset() {
+    const nameEl = $('presetNameInp');
+    const name = nameEl ? nameEl.value.trim() : '';
+    if (!name) { toastSafe('Enter a name.', 'error'); return; }
+    const val = (el) => { const e = $(el); return e ? e.value : ''; };
+    try {
+      await API.createPreset({
+        name, yr: val('fYear'), moNum: val('fMonthNum'), sd: val('fFrom'), ed: val('fTo'), ag: val('fAgent'), pri: val('fPri'), cat: val('fCat'),
+      });
+      await syncPresetsFromServer();
+    } catch (e) { toastSafe(`Could not save preset: ${e.message}`, 'error'); return; }
+    if (typeof D.closeModal === 'function') D.closeModal('presetModal');
+    toastSafe(`Preset saved: ${name}`, 'success');
+  };
+
+  global.delPreset = async function delPreset(id) {
+    try { await API.deletePreset(id); await syncPresetsFromServer(); } catch (e) { toastSafe(`Could not delete preset: ${e.message}`, 'error'); }
+  };
+
+  // ── Real-time sync: poll a tiny version token; full-reload only on change ──
+  let _ticketsVersion = null;
+  let _pollBusy = false;
+  async function checkForUpdates() {
+    if (_pollBusy || !API.isAuthed() || !D.currentUser) return;
+    // Don't yank data out from under an open dialog (e.g. mid-edit).
+    if (document.querySelector('.modal-bg.open')) return;
+    _pollBusy = true;
+    try {
+      const res = await API.ticketsVersion();
+      const token = `${res.data.count}|${res.data.lastModified || ''}`;
+      if (_ticketsVersion !== null && token !== _ticketsVersion) {
+        await loadTicketsFromServer(); // refreshes tickets, notes, tags, snapshots, presets
+      }
+    } catch (e) { /* transient poll error: ignore */ } finally { _pollBusy = false; }
+  }
+  setInterval(checkForUpdates, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdates(); });
 
   // ── Boot: restore session on page load ──
   document.addEventListener('DOMContentLoaded', async () => {

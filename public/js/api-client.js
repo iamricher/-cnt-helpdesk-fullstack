@@ -71,8 +71,17 @@
       return request('/tickets/upload', { method: 'POST', body: fd, isForm: true });
     },
     getStats: () => request('/tickets/stats'),
+    ticketsVersion: () => request('/tickets/version'),
     setRootCause: (ticketId, data) => request(`/tickets/${encodeURIComponent(ticketId)}/root-cause`, { method: 'PATCH', body: data }),
+    addNote: (ticketId, text) => request(`/tickets/${encodeURIComponent(ticketId)}/notes`, { method: 'POST', body: { text } }),
+    deleteNote: (ticketId, index) => request(`/tickets/${encodeURIComponent(ticketId)}/notes/${index}`, { method: 'DELETE' }),
     wipeTickets: () => request('/tickets', { method: 'DELETE' }),
+    deleteTicket: (ticketId) => request(`/tickets/${encodeURIComponent(ticketId)}`, { method: 'DELETE' }),
+
+    // ── Presets ──
+    listPresets: () => request('/presets'),
+    createPreset: (data) => request('/presets', { method: 'POST', body: data }),
+    deletePreset: (id) => request(`/presets/${id}`, { method: 'DELETE' }),
 
     // ── Snapshots ──
     listSnapshots: (limit = 180) => request(`/snapshots?limit=${limit}`),

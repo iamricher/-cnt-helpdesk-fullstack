@@ -283,6 +283,50 @@ const wipeTickets = asyncHandler(async (req, res) => {
   return ok(res, { deleted: result.deletedCount }, 'All tickets removed');
 });
 
+/**
+ * GET /api/tickets/version - tiny change-token for real-time sync. Clients poll
+ * this and only do a full reload when count or lastModified changes.
+ */
+const getVersion = asyncHandler(async (req, res) => {
+  const [count, latest] = await Promise.all([
+    Ticket.estimatedDocumentCount(),
+    Ticket.findOne({}).sort({ updatedAt: -1 }).select('updatedAt').lean(),
+  ]);
+  return ok(res, { count, lastModified: latest ? latest.updatedAt : null });
+});
+
+/** POST /api/tickets/:ticketId/notes - add a shared note (itstaff+). */
+const addNote = asyncHandler(async (req, res) => {
+  const { ticketId } = req.params;
+  const text = (req.body && req.body.text ? String(req.body.text) : '').trim();
+  if (!text) throw new ApiError('Note text is required', 400);
+  const ticket = await Ticket.findOne({ ticketId });
+  if (!ticket) return fail(res, 'Ticket not found', 404);
+  if (!Array.isArray(ticket.notes)) ticket.notes = [];
+  ticket.notes.push({ text, user: req.user.name || req.user.username, ts: new Date().toISOString() });
+  ticket.markModified('notes');
+  await ticket.save();
+  await AuditLog.create({
+    type: 'sla', message: `Note added to ticket ${ticketId}`, actor: req.user.username, ip: req.ip || '',
+  });
+  return created(res, { ticketId, notes: ticket.notes }, 'Note added');
+});
+
+/** DELETE /api/tickets/:ticketId/notes/:index - remove a note by position (itstaff+). */
+const deleteNote = asyncHandler(async (req, res) => {
+  const { ticketId, index } = req.params;
+  const i = parseInt(index, 10);
+  const ticket = await Ticket.findOne({ ticketId });
+  if (!ticket) return fail(res, 'Ticket not found', 404);
+  if (!Array.isArray(ticket.notes) || i < 0 || i >= ticket.notes.length) {
+    return fail(res, 'Note not found', 404);
+  }
+  ticket.notes.splice(i, 1);
+  ticket.markModified('notes');
+  await ticket.save();
+  return ok(res, { ticketId, notes: ticket.notes }, 'Note deleted');
+});
+
 /** DELETE /api/tickets/:ticketId - delete a single ticket (admin+). */
 const deleteTicket = asyncHandler(async (req, res) => {
   const { ticketId } = req.params;
@@ -295,5 +339,6 @@ const deleteTicket = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listTickets, uploadCsv, getStats, listSnapshots, wipeTickets, deleteTicket, refreshTodaySnapshot, setRootCause,
+  listTickets, uploadCsv, getStats, listSnapshots, wipeTickets, deleteTicket,
+  refreshTodaySnapshot, setRootCause, getVersion, addNote, deleteNote,
 };

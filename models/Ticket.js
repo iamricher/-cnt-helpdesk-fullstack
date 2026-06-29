@@ -46,6 +46,9 @@ const ticketSchema = new Schema(
     // Operator-assigned root-cause tag (feeds Recurring Issues analytics).
     // null until tagged; shape: { cause, customText, user, ts }.
     rootCause: { type: Schema.Types.Mixed, default: null },
+
+    // Investigation notes, shared across users. Each: { text, user, ts }.
+    notes: { type: [Schema.Types.Mixed], default: [] },
   },
   { timestamps: true },
 );
@@ -54,6 +57,7 @@ const ticketSchema = new Schema(
 ticketSchema.index({ priority: 1, status: 1 });
 ticketSchema.index({ date: -1 });
 ticketSchema.index({ assignee: 1, status: 1 });
+ticketSchema.index({ updatedAt: -1 }); // powers the lightweight /version change-check (real-time sync)
 
 /** Map a stored document back into the plain shape the SLA engine expects. */
 ticketSchema.methods.toEngineRecord = function toEngineRecord() {

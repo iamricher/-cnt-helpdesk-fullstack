@@ -10,6 +10,7 @@ router.use('/snapshots', require('./snapshotRoutes'));
 router.use('/users', require('./userRoutes'));
 router.use('/settings', require('./settingRoutes'));
 router.use('/audit', require('./auditRoutes'));
+router.use('/presets', require('./presetRoutes'));
 
 router.get('/health', (req, res) => res.json({ success: true, message: 'API healthy', data: { ts: new Date().toISOString() } }));
 
