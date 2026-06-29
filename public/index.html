@@ -5464,6 +5464,7 @@ document.addEventListener('keydown',e=>{
     }
   }
   const map={d:'dashboard',o:'openTickets',a:'agents',r:'recurring',u:'upload',l:'auditlog','?':'sc','f':'focus'};
+  if(!e.key)return; // some events (e.g. browser autofill) fire keydown with no key
   const target=map[e.key.toLowerCase()];if(!target)return;
   if(target==='sc'){openModal('scModal');return;}
   if(target==='focus'){const s=q('rawSearch');if(s){nav('audit');setTimeout(()=>s.focus(),100);}return;}
