@@ -733,6 +733,50 @@ select.tbf-ctrl{cursor:pointer;-webkit-appearance:none;padding-right:20px;
   #kpiGrid{grid-template-columns:1fr 1fr!important;}
   #sessionBar{left:0!important;}
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Motion & interaction polish (2026-06). Interaction-triggered so it
+   never replays on the frequent data re-renders, and fully disabled
+   under prefers-reduced-motion.
+───────────────────────────────────────────────────────────────── */
+:root{ --ease-out:cubic-bezier(.22,1,.36,1); }
+
+/* Panels gain gentle depth on hover (no positional jump for big cards);
+   small stat cards get a subtle lift. */
+.card{ transition:box-shadow .22s var(--ease-out), transform .22s var(--ease-out); }
+.card:hover{ box-shadow:var(--sh2); }
+.kpi{ transition:box-shadow .22s var(--ease-out), transform .22s var(--ease-out); }
+.kpi:hover{ transform:translateY(-2px); box-shadow:var(--sh2); }
+
+/* Buttons: smooth hover lift + tactile press, across every variant. */
+.btn{ transition:background .15s var(--ease-out), color .15s var(--ease-out), box-shadow .18s var(--ease-out), transform .12s var(--ease-out); }
+.btn:hover{ transform:translateY(-1px); }
+.btn:active{ transform:translateY(1px) scale(.99); }
+.btn-red:hover{ box-shadow:0 6px 16px rgba(220,38,38,.32); }
+
+/* Compact icon / tab / utility controls: quiet press feedback. */
+.tb-icon, .rpt-tab, .mtbtn, .modal-x, .sb-util-btn{ transition:all .15s var(--ease-out); }
+.tb-icon:active, .rpt-tab:active, .mtbtn:active, .modal-x:active, .sb-util-btn:active{ transform:scale(.93); }
+
+/* Sidebar nav: tactile indent on hover (transform = no reflow). */
+.sb-item:hover{ transform:translateX(3px); }
+
+/* Visible keyboard focus ring everywhere (accessibility, no layout shift). */
+a:focus-visible, button:focus-visible, [role="button"]:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible, .sb-item:focus-visible{
+  outline:2px solid var(--red); outline-offset:2px; border-radius:6px;
+}
+
+/* A touch more presence on page entrance (fires on navigation, not on data refresh). */
+.page{ animation:pageIn .32s var(--ease-out) both; }
+@keyframes pageIn{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important; animation-iteration-count:1 !important;
+    transition-duration:.001ms !important; scroll-behavior:auto !important;
+  }
+}
 </style>
 </head>
 <body>
