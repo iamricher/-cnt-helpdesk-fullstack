@@ -1,8 +1,14 @@
 'use strict';
 
 const express = require('express');
+const multer = require('multer');
+const ticketCtrl = require('../controllers/ticketController');
+const { requireApiKey } = require('../middleware/auth');
 
 const router = express.Router();
+
+// In-memory upload (serverless-friendly); 12 MB cap. Shared by the API-key import.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
 
 router.use('/auth', require('./authRoutes'));
 router.use('/tickets', require('./ticketRoutes'));
@@ -11,6 +17,10 @@ router.use('/users', require('./userRoutes'));
 router.use('/settings', require('./settingRoutes'));
 router.use('/audit', require('./auditRoutes'));
 router.use('/presets', require('./presetRoutes'));
+
+// Machine-to-machine CSV import. API key is checked BEFORE the file is parsed,
+// so unauthenticated callers never get their upload read.
+router.post('/upload-csv', requireApiKey, upload.single('file'), ticketCtrl.uploadCsvApiKey);
 
 router.get('/health', (req, res) => res.json({ success: true, message: 'API healthy', data: { ts: new Date().toISOString() } }));
 

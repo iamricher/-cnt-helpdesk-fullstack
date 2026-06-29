@@ -1,9 +1,18 @@
 'use strict';
 
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const config = require('../config');
 const User = require('../models/User');
 const { fail, asyncHandler } = require('../utils/apiResponse');
+
+/** Constant-time string compare (avoids leaking key length/content via timing). */
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
 
 /** Sign a JWT for a user document. */
 function signToken(user) {
@@ -53,4 +62,21 @@ function requireRole(...allowed) {
   };
 }
 
-module.exports = { signToken, requireAuth, requireRole };
+/**
+ * Authenticate a machine-to-machine request via the `x-api-key` header against
+ * process.env.UPLOAD_API_KEY (constant-time compare). Fails closed if the key
+ * isn't configured on the server.
+ */
+function requireApiKey(req, res, next) {
+  const expected = process.env.UPLOAD_API_KEY;
+  if (!expected) return fail(res, 'Upload API key is not configured on the server', 503);
+  const provided = req.headers['x-api-key'];
+  if (!provided || !safeEqual(provided, expected)) {
+    return fail(res, 'Invalid or missing API key', 401);
+  }
+  return next();
+}
+
+module.exports = {
+  signToken, requireAuth, requireRole, requireApiKey,
+};

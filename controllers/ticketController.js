@@ -83,15 +83,12 @@ const listTickets = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/tickets/upload  (multipart field "file" OR JSON { csv: "..." })
- * Parses a Spiceworks CSV server-side, derives SLA fields, and upserts each
- * row by ticketId so re-uploads sync rather than duplicate. Then refreshes
- * today's snapshot. Restricted to itstaff+ in the route layer.
+ * Core CSV import shared by the UI upload and the API-key endpoint: parse a
+ * Spiceworks CSV, derive SLA fields, upsert each row by ticketId (so re-uploads
+ * sync rather than duplicate), refresh today's snapshot, and write an audit row.
+ * Returns { processed, upserted, modified }.
  */
-const uploadCsv = asyncHandler(async (req, res) => {
-  let csvText = null;
-  if (req.file && req.file.buffer) csvText = req.file.buffer.toString('utf8');
-  else if (req.body && typeof req.body.csv === 'string') csvText = req.body.csv;
+async function importCsvText(csvText, actorName, ip) {
   if (!csvText || !csvText.trim()) throw new ApiError('No CSV content provided', 400);
 
   const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true, transformHeader: (h) => h.trim() });
@@ -180,11 +177,38 @@ const uploadCsv = asyncHandler(async (req, res) => {
   await AuditLog.create({
     type: 'upload',
     message: `CSV upload: ${upserted} new, ${modified} updated (${processed} rows processed)`,
-    actor: req.user ? req.user.username : 'system',
-    ip: req.ip || '',
+    actor: actorName || 'system',
+    ip: ip || '',
   });
 
-  return created(res, { processed, upserted, modified }, 'Upload processed');
+  return { processed, upserted, modified };
+}
+
+/**
+ * POST /api/tickets/upload  (multipart field "file" OR JSON { csv: "..." })
+ * Restricted to itstaff+ in the route layer. Used by the dashboard UI.
+ */
+const uploadCsv = asyncHandler(async (req, res) => {
+  let csvText = null;
+  if (req.file && req.file.buffer) csvText = req.file.buffer.toString('utf8');
+  else if (req.body && typeof req.body.csv === 'string') csvText = req.body.csv;
+  const result = await importCsvText(csvText, req.user ? req.user.username : 'system', req.ip);
+  return created(res, result, 'Upload processed');
+});
+
+/**
+ * POST /api/upload-csv  (multipart field "file")
+ * Machine-to-machine CSV import authenticated by the x-api-key header
+ * (see requireApiKey middleware). Returns { success, message, count }.
+ */
+const uploadCsvApiKey = asyncHandler(async (req, res) => {
+  const csvText = req.file && req.file.buffer ? req.file.buffer.toString('utf8') : null;
+  const { processed, upserted, modified } = await importCsvText(csvText, 'api-key', req.ip);
+  return res.status(200).json({
+    success: true,
+    message: `Imported ${processed} rows (${upserted} new, ${modified} updated)`,
+    count: processed,
+  });
 });
 
 /** Compute and persist today's snapshot from the full ticket set. */
@@ -341,6 +365,6 @@ const deleteTicket = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listTickets, uploadCsv, getStats, listSnapshots, wipeTickets, deleteTicket,
+  listTickets, uploadCsv, uploadCsvApiKey, getStats, listSnapshots, wipeTickets, deleteTicket,
   refreshTodaySnapshot, setRootCause, getVersion, addNote, deleteNote,
 };
