@@ -8,7 +8,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requireRole('superadmin'));
 
 router.get('/', ctrl.listUsers);
 

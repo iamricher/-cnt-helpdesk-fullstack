@@ -2110,9 +2110,13 @@ function doLogout(reason=''){
 }
 
 const ROLE_PAGES={
+  // superadmin: everything
   superadmin:['dashboard','openTickets','agents','recurring','catanalytics','audit','upload','report','users','auditlog','settings'],
-  admin:['dashboard','openTickets','agents','recurring','catanalytics','audit','upload','report','users','auditlog','settings'],
-  itstaff:['dashboard','openTickets','agents','recurring','catanalytics','upload'],
+  // admin: all except User Management, Audit Log, Settings
+  admin:['dashboard','openTickets','agents','recurring','catanalytics','audit','upload','report'],
+  // itstaff: admin's set minus Data Audit
+  itstaff:['dashboard','openTickets','agents','recurring','catanalytics','upload','report'],
+  // viewer: analytics only (no Data Audit, Upload, Generate Report)
   viewer:['dashboard','openTickets','agents','recurring','catanalytics']
 };
 function allowedPages(){return ROLE_PAGES[currentUser?.role]||ROLE_PAGES.viewer;}
@@ -2132,7 +2136,7 @@ function applyRoleUI(){
   // Section headers: "Data" shows if audit/upload/report visible; "Admin" only for admin role
   const dataVisible=allowed.has('audit')||allowed.has('upload')||allowed.has('report');
   const ds=q('data-section');if(ds)ds.style.display=dataVisible?'':'none';
-  const as=q('adm-section');if(as)as.style.display=(currentUser.role==='admin'||currentUser.role==='superadmin')?'':'none';
+  const as=q('adm-section');if(as)as.style.display=currentUser.role==='superadmin'?'':'none';
 }
 
 function togglePw(id,btn){const el=q(id);el.type=el.type==='password'?'text':'password';btn.innerHTML=el.type==='text'?'<i class="fa fa-eye-slash"></i>':'<i class="fa fa-eye"></i>';}

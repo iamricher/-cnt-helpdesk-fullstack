@@ -253,7 +253,7 @@
   // server copy survived and reloaded on the next page load. This makes the
   // "Wipe All Data" button actually purge MongoDB (admin+ only).
   global.wipeDB = async function wipeDB() {
-    if (D.currentUser && !['admin', 'superadmin'].includes(D.currentUser.role)) {
+    if (D.currentUser && D.currentUser.role !== 'superadmin') {
       toastSafe('You do not have permission to wipe data.', 'error');
       return;
     }
